@@ -2,11 +2,11 @@
 import re
 from cmd import run_cmd
 
-class NVSMI_LOG(dict):
+class NVLog(dict):
 
     __indent_re__ = re.compile('^ *')
     __tailing_spaces_re__ = re.compile(' *$')
-    __version_re__ = re.compile(r'v([1-9.]+)$')
+    __version_re__ = re.compile(r'v([0-9.]+)$')
 
     def __init__(self):
         super().__init__()
@@ -19,16 +19,23 @@ class NVSMI_LOG(dict):
         path = [self]
         self['version'] = self.__version__()
         for line in lines[1:]:
-            indent = NVSMI_LOG.__get_indent__(line)
-            line = NVSMI_LOG.__parse_key_value_pair__(line)
+            indent = NVLog.__get_indent__(line)
+            line = NVLog.__parse_key_value_pair__(line)
             while indent < len(path) * 4 - 4:
                 path.pop()
             cursor = path[-1]
             if len(line) == 1:
-                cursor[line[0]] = {}
+                if line[0] == 'Processes':
+                    cursor[line[0]] = []
+                else:
+                    cursor[line[0]] = {}
                 cursor = cursor[line[0]]
                 path.append(cursor)
             elif len(line) == 2:
+                if line[0] == 'Process ID':
+                    cursor.append({})
+                    cursor = cursor[-1]
+                    path.append(cursor)
                 cursor[line[0]] = line[1]
 
         self['Attached GPUs'] = {}
@@ -40,13 +47,13 @@ class NVSMI_LOG(dict):
 
     @staticmethod
     def __get_indent__(line):
-        return len(NVSMI_LOG.__indent_re__.match(line).group())
+        return len(NVLog.__indent_re__.match(line).group())
 
     @staticmethod
     def __parse_key_value_pair__(line):
         result = line.split(' : ')
-        result[0] = NVSMI_LOG.__indent_re__.sub('', result[0])
-        result[0] = NVSMI_LOG.__tailing_spaces_re__.sub('', result[0])
+        result[0] = NVLog.__indent_re__.sub('', result[0])
+        result[0] = NVLog.__tailing_spaces_re__.sub('', result[0])
         if len(result) > 1:
             try:
                 result[1] = int(result[1])
@@ -62,7 +69,14 @@ class NVSMI_LOG(dict):
         output = []
         output.append(self['Timestamp'])
         output.append('+-----------------------------------------------------------------------------+')
-        output.append('| NVIDIA-SMI %s       Driver Version: %s       CUDA Version: %s     |' % (self['version'], self['Driver Version'], self['CUDA Version']))
+        values = []
+        values.append(self['version'])
+        values.append(self['Driver Version'])
+        if 'CUDA Version' in self:
+            values.append(self['CUDA Version'])
+        else:
+            values.append('N/A')
+        output.append('| NVIDIA-SMI %s       Driver Version: %s       CUDA Version: %-5s    |' % tuple(values))
         output.append('|-------------------------------+----------------------+----------------------+')
         output.append('| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |')
         output.append('| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |')
@@ -101,17 +115,28 @@ class NVSMI_LOG(dict):
                     processes.append((i, j))
         if len(processes) == 0:
             output.append('|  No running processes found                                                 |')
+        for i, process in processes:
+            values = []
+            values.append(i)
+            values.append(process['Process ID'])
+            values.append(process['Type'])
+            if len(process['Name']) > 42:
+                values.append('...' + process['Name'][-39:])
+            else:
+                values.append(process['Name'])
+            values.append(process['Used GPU Memory'].replace(' ', ''))
+            output.append('|   %2d     %5d      %s   %-42s %8s |' % tuple(values))
         output.append('+-----------------------------------------------------------------------------+')
         return '\n'.join(output)
 
     def __version__(self):
         lines = run_cmd(['nvidia-smi', '-h'], silent=True)
         lines = lines.split('\n')
-        result = NVSMI_LOG.__version_re__.search(lines[0]).group(1)
+        result = NVLog.__version_re__.search(lines[0]).group(1)
         return result
 
 if __name__ == '__main__':
     import json
-    log = NVSMI_LOG()
-    print(json.dumps(log, indent=2))
+    log = NVLog()
+    #print(json.dumps(log, indent=2))
     print(log.as_table())
