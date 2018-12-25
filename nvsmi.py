@@ -1,5 +1,7 @@
 #!/bin/python3
+import os
 import re
+import psutil
 from cmd import run_cmd
 
 class NVLog(dict):
@@ -63,7 +65,22 @@ class NVLog(dict):
                 result[1] = False
         return result
 
-    def as_table(self):
+    def __get_processes__(self):
+        processes = []
+        for i, gpu in enumerate(self['Attached GPUs']):
+            gpu = self['Attached GPUs'][gpu]
+            if gpu['Processes']:
+                for j in gpu['Processes']:
+                    processes.append((i, j))
+        return processes
+
+    def __version__(self):
+        lines = run_cmd(['nvidia-smi', '-h'], silent=True)
+        lines = lines.split('\n')
+        result = NVLog.__version_re__.search(lines[0]).group(1)
+        return result
+
+    def gpu_table(self):
         output = []
         output.append(self['Timestamp'])
         output.append('+-----------------------------------------------------------------------------+')
@@ -100,17 +117,15 @@ class NVLog(dict):
             values.append(gpu['Compute Mode'])
             output.append('| %3s   %3s    %s   %3dW / %3dW |  %8s / %8s |     %3s     %8s |' % tuple(values))
             output.append('+-----------------------------------------------------------------------------+')
-        output.append('')
+        return '\n'.join(output)
+
+    def processes_table(self):
+        output = []
         output.append('+-----------------------------------------------------------------------------+')
         output.append('| Processes:                                                       GPU Memory |')
         output.append('|  GPU       PID   Type   Process name                             Usage      |')
         output.append('|=============================================================================|')
-        processes = []
-        for i, gpu in enumerate(self['Attached GPUs']):
-            gpu = self['Attached GPUs'][gpu]
-            if gpu['Processes']:
-                for j in gpu['Processes']:
-                    processes.append((i, j))
+        processes = self.__get_processes__()
         if len(processes) == 0:
             output.append('|  No running processes found                                                 |')
         for i, process in processes:
@@ -119,22 +134,53 @@ class NVLog(dict):
             values.append(process['Process ID'])
             values.append(process['Type'])
             if len(process['Name']) > 42:
-                values.append('...' + process['Name'][-39:])
+                values.append(process['Name'][:39] + '...')
             else:
                 values.append(process['Name'])
             values.append(process['Used GPU Memory'].replace(' ', ''))
-            output.append('|   %2d     %5d      %s   %-42s %8s |' % tuple(values))
+            output.append('|   %2d     %5d %6s   %-42s %8s |' % tuple(values))
         output.append('+-----------------------------------------------------------------------------+')
         return '\n'.join(output)
 
-    def __version__(self):
-        lines = run_cmd(['nvidia-smi', '-h'], silent=True)
-        lines = lines.split('\n')
-        result = NVLog.__version_re__.search(lines[0]).group(1)
-        return result
+    def as_table(self):
+        output = []
+        output.append(self.gpu_table())
+        output.append('')
+        output.append(self.processes_table())
+        return '\n'.join(output)
+
+class NVLogPlus(NVLog):
+
+    def processes_table(self):
+        output = []
+        output.append('+-----------------------------------------------------------------------------+')
+        output.append('| Processes:                                                       GPU Memory |')
+        output.append('|  GPU       PID   User   Process name                             Usage      |')
+        output.append('|=============================================================================|')
+        processes = self.__get_processes__()
+        if len(processes) == 0:
+            output.append('|  No running processes found                                                 |')
+        for i, process in processes:
+            values = []
+            values.append(i)
+            values.append(process['Process ID'])
+            p = psutil.Process(process['Process ID'])
+            with p.oneshot():
+                values.append(p.username()[:8].center(8))
+                command = p.cmdline()
+                command[0] = os.path.basename(command[0])
+                command = ' '.join(command)
+                if len(command) > 42:
+                    values.append(command[:39] + '...')
+                else:
+                    values.append(command)
+            values.append(process['Used GPU Memory'].replace(' ', ''))
+            output.append('|   %2d     %5d %8s %-42s %8s |' % tuple(values))
+        output.append('+-----------------------------------------------------------------------------+')
+        return '\n'.join(output)
 
 if __name__ == '__main__':
     import json
-    log = NVLog()
-    print(json.dumps(log, indent=2))
+    log = NVLogPlus()
+    #print(json.dumps(log, indent=2))
     print(log.as_table())

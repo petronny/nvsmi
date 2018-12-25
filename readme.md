@@ -4,7 +4,15 @@
 from nvsmi import NVLog
 
 log = NVLog()
+
+# Access attributes
 print(log['version']))
+
+# Print the original `nvidia-smi` table
+print(log.as_table())
+
+# Print the `nvidia-smi` table enhanced by me
+log = NVLogPlus()
 print(log.as_table())
 ```
 
