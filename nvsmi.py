@@ -87,7 +87,7 @@ class NVLog(dict):
             values.append('On' if gpu['Persistence Mode'] else 'Off')
             values.append(gpu['PCI']['Bus Id'])
             values.append('On' if gpu['Display Active'] else 'Off')
-            output.append('|   %d  %s    %3s  | %s %3s |                  N/A |' % tuple(values))
+            output.append('|   %d  %-19s %3s  | %s %3s |                  N/A |' % tuple(values))
             values = []
             values.append(gpu['Fan Speed'].replace(' ', ''))
             values.append(gpu['Temperature']['GPU Current Temp'].replace(' ', ''))
