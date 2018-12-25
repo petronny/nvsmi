@@ -5,7 +5,6 @@ from cmd import run_cmd
 class NVLog(dict):
 
     __indent_re__ = re.compile('^ *')
-    __tailing_spaces_re__ = re.compile(' *$')
     __version_re__ = re.compile(r'v([0-9.]+)$')
 
     def __init__(self):
@@ -52,8 +51,7 @@ class NVLog(dict):
     @staticmethod
     def __parse_key_value_pair__(line):
         result = line.split(' : ')
-        result[0] = NVLog.__indent_re__.sub('', result[0])
-        result[0] = NVLog.__tailing_spaces_re__.sub('', result[0])
+        result[0] = result[0].strip()
         if len(result) > 1:
             try:
                 result[1] = int(result[1])
@@ -138,5 +136,5 @@ class NVLog(dict):
 if __name__ == '__main__':
     import json
     log = NVLog()
-    #print(json.dumps(log, indent=2))
+    print(json.dumps(log, indent=2))
     print(log.as_table())
