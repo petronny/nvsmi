@@ -1,11 +1,10 @@
 ## Usage
 
 ```python
-import json
 from nvsmi import NVLog
 
 log = NVLog()
-print(json.dumps(log, indent=2))
+print(log['version']))
 print(log.as_table())
 ```
 
