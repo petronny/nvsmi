@@ -115,7 +115,7 @@ class NVLog(dict):
             values.append(gpu['FB Memory Usage']['Total'].replace(' ', ''))
             values.append(gpu['Utilization']['Gpu'].replace(' ', ''))
             values.append(gpu['Compute Mode'])
-            output.append('| %3s   %3s    %s   %3dW / %3dW |  %8s / %8s |     %3s     %8s |' % tuple(values))
+            output.append('| %3s   %3s    %s   %3dW / %3dW |  %8s / %8s |    %4s     %8s |' % tuple(values))
             output.append('+-----------------------------------------------------------------------------+')
         return '\n'.join(output)
 
